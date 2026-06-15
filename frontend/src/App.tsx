@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { api } from './api/client';
 import { StageCanvas } from './components/StageCanvas';
 import { ControlPanel } from './components/ControlPanel';
@@ -56,13 +56,22 @@ function App() {
     text: '',
   });
 
+  const [musicEnabled, setMusicEnabled] = useState(false);
+  const [currentDecibels, setCurrentDecibels] = useState(0);
+  const [loopRunning, setLoopRunning] = useState(false);
+  const [decibelFactor, setDecibelFactor] = useState(0);
+  const [maxWobblePercent, setMaxWobblePercent] = useState(10);
+  const lastDecibelsSentRef = useRef(0);
+  const lastMusicToggleRef = useRef(false);
+
   const fetchMetadata = useCallback(async () => {
     try {
-      const [zRes, dRes, lRes, sRes] = await Promise.all([
+      const [zRes, dRes, lRes, sRes, mRes] = await Promise.all([
         api.getZones(),
         api.getDirections(),
         api.getLayout(),
         api.getStatus(),
+        api.getMusicStatus().catch(() => null),
       ]);
       setZones(zRes);
       setDirections(dRes);
@@ -73,6 +82,15 @@ function App() {
       setRs485Connected(sRes.rs485Connected);
       if (sRes.fanStatuses?.length) setFans(sRes.fanStatuses);
       if (sRes.smokeMachineStatuses?.length) setSmokeMachines(sRes.smokeMachineStatuses);
+      if (mRes) {
+        setMusicEnabled(mRes.enabled);
+        setCurrentDecibels(mRes.currentDecibels);
+        setLoopRunning(mRes.loopRunning);
+        setDecibelFactor(mRes.decibelFactor);
+        setMaxWobblePercent(mRes.maxWobblePercent);
+        lastDecibelsSentRef.current = mRes.currentDecibels;
+        lastMusicToggleRef.current = mRes.enabled;
+      }
     } catch (e) {
       console.warn('初始化元数据失败，使用本地默认值', e);
       setZones([
@@ -105,15 +123,25 @@ function App() {
     fetchMetadata();
     const interval = setInterval(async () => {
       try {
-        const status = await api.getStatus();
+        const [status, music] = await Promise.all([
+          api.getStatus(),
+          api.getMusicStatus().catch(() => null),
+        ]);
         setSystemOnline(status.systemOnline);
         setRs485Connected(status.rs485Connected);
         if (status.fanStatuses?.length) setFans([...status.fanStatuses]);
         if (status.smokeMachineStatuses?.length) setSmokeMachines([...status.smokeMachineStatuses]);
+        if (music) {
+          setLoopRunning(music.loopRunning);
+          setDecibelFactor(music.decibelFactor);
+          if (!lastMusicToggleRef.current || music.enabled) {
+            setMusicEnabled(music.enabled);
+          }
+        }
       } catch {
         setRs485Connected(false);
       }
-    }, 2000);
+    }, 1500);
     return () => clearInterval(interval);
   }, [fetchMetadata]);
 
@@ -159,13 +187,62 @@ function App() {
       if (resp.success) {
         if (resp.fanSettings) setFans([...resp.fanSettings]);
         if (resp.smokeMachineSettings) setSmokeMachines([...resp.smokeMachineSettings]);
-        setStatusMessage({ type: 'success', text: '✓ 所有设备已紧急停止' });
+        setMusicEnabled(false);
+        setCurrentDecibels(0);
+        setLoopRunning(false);
+        setDecibelFactor(0);
+        lastDecibelsSentRef.current = 0;
+        lastMusicToggleRef.current = false;
+        setStatusMessage({ type: 'success', text: '✓ 所有设备已紧急停止，音乐律动已关闭' });
       } else {
         setStatusMessage({ type: 'error', text: `✗ ${resp.message}` });
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setStatusMessage({ type: 'error', text: `✗ 网络错误: ${msg}` });
+    }
+  };
+
+  const handleMusicToggle = async (enabled: boolean) => {
+    try {
+      setMusicEnabled(enabled);
+      lastMusicToggleRef.current = enabled;
+      const resp = await api.configureMusic({
+        enabled,
+        initialDecibels: enabled ? currentDecibels : undefined,
+      });
+      setLoopRunning(resp.loopRunning);
+      setDecibelFactor(resp.decibelFactor);
+      if (!enabled) {
+        setCurrentDecibels(0);
+        lastDecibelsSentRef.current = 0;
+      }
+      if (enabled && !resp.loopRunning) {
+        setStatusMessage({
+          type: 'success',
+          text: '⚠ 律动模式已开启，请先选择舞台区域应用特效后自动启动循环',
+        });
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setStatusMessage({ type: 'error', text: `✗ 律动设置失败: ${msg}` });
+      setMusicEnabled(!enabled);
+      lastMusicToggleRef.current = !enabled;
+    }
+  };
+
+  const handleDecibelsChange = async (db: number) => {
+    setCurrentDecibels(db);
+    if (db === lastDecibelsSentRef.current) return;
+    const diff = Math.abs(db - lastDecibelsSentRef.current);
+    if (diff < 3) return;
+    lastDecibelsSentRef.current = db;
+    try {
+      const resp = await api.reportMusicBeat({ decibels: db });
+      setDecibelFactor(resp.decibelFactor);
+      setLoopRunning(resp.loopRunning);
+    } catch {
+      // 忽略快速移动中失败
     }
   };
 
@@ -217,12 +294,19 @@ function App() {
         durationSeconds={durationSeconds}
         audienceProtection={audienceProtection}
         statusMessage={statusMessage}
+        musicEnabled={musicEnabled}
+        currentDecibels={currentDecibels}
+        loopRunning={loopRunning}
+        decibelFactor={decibelFactor}
+        maxWobblePercent={maxWobblePercent}
         onZoneSelect={setSelectedZone}
         onDirectionSelect={setSelectedDirection}
         onSmokeDensityChange={setSmokeDensity}
         onContainmentChange={setContainmentStrength}
         onDurationChange={setDurationSeconds}
         onAudienceProtectionToggle={setAudienceProtection}
+        onMusicToggle={handleMusicToggle}
+        onDecibelsChange={handleDecibelsChange}
         onApply={handleApply}
         onEmergencyStop={handleEmergencyStop}
         applying={applying}

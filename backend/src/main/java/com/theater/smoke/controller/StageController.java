@@ -91,4 +91,34 @@ public class StageController {
                 .collect(Collectors.toList());
         return ResponseEntity.ok(directions);
     }
+
+    @PostMapping("/music/config")
+    public ResponseEntity<StageControlService.MusicStatus> configureMusicMode(
+            @RequestBody Map<String, Object> body) {
+        Boolean enabled = (Boolean) body.get("enabled");
+        if (enabled == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        StageControlService.MusicStatus status = controlService.setMusicModeEnabled(enabled);
+        Number initDb = (Number) body.get("initialDecibels");
+        if (initDb != null) {
+            status = controlService.reportDecibels(initDb.intValue());
+        }
+        return ResponseEntity.ok(status);
+    }
+
+    @PostMapping("/music/beat")
+    public ResponseEntity<StageControlService.MusicStatus> reportMusicBeat(
+            @RequestBody Map<String, Object> body) {
+        Number db = (Number) body.get("decibels");
+        if (db == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(controlService.reportDecibels(db.intValue()));
+    }
+
+    @GetMapping("/music/status")
+    public ResponseEntity<StageControlService.MusicStatus> getMusicStatus() {
+        return ResponseEntity.ok(controlService.getMusicStatus());
+    }
 }

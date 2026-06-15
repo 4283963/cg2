@@ -108,3 +108,22 @@ export interface ManualSmokeAdjust {
   outputPercent?: number;
   active?: boolean;
 }
+
+export interface MusicStatus {
+  enabled: boolean;
+  currentDecibels: number;
+  decibelFactor: number;
+  maxWobblePercent: number;
+  rhythmHz: number;
+  tickIntervalMs: number;
+  loopRunning: boolean;
+}
+
+export interface MusicConfig {
+  enabled: boolean;
+  initialDecibels?: number;
+}
+
+export interface MusicBeat {
+  decibels: number;
+}

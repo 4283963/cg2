@@ -7,6 +7,9 @@ import type {
   SystemStatus,
   ManualFanAdjust,
   ManualSmokeAdjust,
+  MusicStatus,
+  MusicConfig,
+  MusicBeat,
 } from '../types';
 
 const API_BASE = '/api';
@@ -50,4 +53,15 @@ export const api = {
       method: 'POST',
     }),
   health: () => request<{ status: string }>('/health'),
+  getMusicStatus: () => request<MusicStatus>('/stage/music/status'),
+  configureMusic: (body: MusicConfig) =>
+    request<MusicStatus>('/stage/music/config', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  reportMusicBeat: (body: MusicBeat) =>
+    request<MusicStatus>('/stage/music/beat', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
 };

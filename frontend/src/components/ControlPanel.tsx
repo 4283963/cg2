@@ -20,12 +20,19 @@ interface ControlPanelProps {
   durationSeconds: number;
   audienceProtection: boolean;
   statusMessage: { type: 'success' | 'error' | ''; text: string };
+  musicEnabled: boolean;
+  currentDecibels: number;
+  loopRunning: boolean;
+  decibelFactor: number;
+  maxWobblePercent: number;
   onZoneSelect: (zone: StageZoneName) => void;
   onDirectionSelect: (dir: WindDirectionName) => void;
   onSmokeDensityChange: (v: number) => void;
   onContainmentChange: (v: number) => void;
   onDurationChange: (v: number) => void;
   onAudienceProtectionToggle: (v: boolean) => void;
+  onMusicToggle: (enabled: boolean) => void;
+  onDecibelsChange: (db: number) => void;
   onApply: () => void;
   onEmergencyStop: () => void;
   applying: boolean;
@@ -57,12 +64,19 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   durationSeconds,
   audienceProtection,
   statusMessage,
+  musicEnabled,
+  currentDecibels,
+  loopRunning,
+  decibelFactor,
+  maxWobblePercent,
   onZoneSelect,
   onDirectionSelect,
   onSmokeDensityChange,
   onContainmentChange,
   onDurationChange,
   onAudienceProtectionToggle,
+  onMusicToggle,
+  onDecibelsChange,
   onApply,
   onEmergencyStop,
   applying,
@@ -180,6 +194,48 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             className={`toggle ${audienceProtection ? 'on' : ''}`}
             onClick={() => onAudienceProtectionToggle(!audienceProtection)}
           />
+        </div>
+      </div>
+
+      <div className="panel-section">
+        <div className="section-title">
+          🎵 音乐律动模式
+          <span className={`music-indicator ${musicEnabled ? 'on' : ''}`}>
+            {musicEnabled ? (loopRunning ? '● 运行中' : '○ 等待舞台状态') : '○ 关闭'}
+          </span>
+        </div>
+        <div className="toggle-row">
+          <span className="toggle-label">开启音乐律动（风机风速随分贝呼吸起伏）</span>
+          <div
+            className={`toggle music ${musicEnabled ? 'on' : ''}`}
+            onClick={() => onMusicToggle(!musicEnabled)}
+          />
+        </div>
+        <div className="slider-group" style={{ opacity: musicEnabled ? 1 : 0.45 }}>
+          <div className="slider-label">
+            <span>音控台模拟分贝 (0-120dB)</span>
+            <span className="slider-value">{currentDecibels}dB</span>
+          </div>
+          <input
+            type="range"
+            min={0}
+            max={120}
+            value={currentDecibels}
+            onChange={(e) => onDecibelsChange(Number(e.target.value))}
+            disabled={!musicEnabled}
+          />
+          <div className="db-scale">
+            <span style={{ color: '#6b7280' }}>安静</span>
+            <span style={{ color: '#10b981' }}>对话</span>
+            <span style={{ color: '#f59e0b' }}>音乐</span>
+            <span style={{ color: '#ef4444' }}>高潮</span>
+          </div>
+          {musicEnabled && (
+            <div className="rhythm-info">
+              <div>扰动幅度: ±{Math.round(maxWobblePercent * decibelFactor)}% (上限±{maxWobblePercent}%)</div>
+              <div>归一化强度: {Math.round(decibelFactor * 100)}%</div>
+            </div>
+          )}
         </div>
       </div>
 
