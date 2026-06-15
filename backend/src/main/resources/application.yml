@@ -1,0 +1,35 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+spring:
+  application:
+    name: smoke-control-system
+
+cors:
+  allowed-origins: "*"
+  allowed-methods: GET,POST,PUT,DELETE,OPTIONS
+  allowed-headers: "*"
+
+hardware:
+  rs485:
+    enabled: false
+    host: 192.168.1.100
+    port: 502
+    timeout: 3000
+    retry-count: 3
+
+smoke:
+  machine:
+    warmup-time-seconds: 30
+    max-output-rate: 100
+
+fan:
+  min-speed-percent: 0
+  max-speed-percent: 100
+
+stage:
+  width-meters: 16
+  depth-meters: 10
+  audience-safe-distance-meters: 1
