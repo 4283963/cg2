@@ -13,7 +13,7 @@ export type WindDirectionName =
   | 'NE'
   | 'E'
   | 'SE'
-  | 'S'
+  | 'S'  
   | 'SW'
   | 'W'
   | 'NW'
